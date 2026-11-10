@@ -17,6 +17,14 @@ DATABASE = "recipes.db"
 app = Flask(__name__)
 
 
+def hash_password(plaintext_password: str) -> str:
+    return generate_password_hash(plaintext_password)
+
+
+def verify_password(stored_hash: str, candidate_password: str) -> bool:
+    return check_password_hash(stored_hash, candidate_password)
+
+
 def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(DATABASE)
@@ -78,7 +86,7 @@ def register():
     try:
         cur = db.execute(
             "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, generate_password_hash(password)),
+            (username, hash_password(password)),
         )
         db.commit()
     except sqlite3.IntegrityError:
@@ -97,7 +105,7 @@ def login():
     ).fetchone()
     # Same 401 for "no such user" and "wrong password" so attackers
     # can't tell which usernames exist.
-    if row is None or not check_password_hash(row["password_hash"], password):
+    if row is None or not verify_password(row["password_hash"], password):
         return jsonify({"error": "invalid username or password"}), 401
     return jsonify({"message": "login successful", "username": row["username"]})
 
