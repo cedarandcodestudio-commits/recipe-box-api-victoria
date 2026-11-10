@@ -3,11 +3,14 @@
 A working Flask + SQLite CRUD API for recipes. It stores data perfectly —
 and it trusts everyone. There is no authentication and no authorization yet.
 That is the point: you will add both, lesson by lesson, in Units 2 and 3.
+
+Week 8 additions: a users table, POST /register and POST /login.
 """
 
 import sqlite3
 
 from flask import Flask, g, jsonify, request
+from werkzeug.security import check_password_hash, generate_password_hash
 
 DATABASE = "recipes.db"
 
@@ -28,6 +31,78 @@ def close_db(exception):
     if db is not None:
         db.close()
 
+
+# --- Week 8: users table -------------------------------------------------
+
+def init_users_table():
+    """Create the users table if it doesn't exist yet."""
+    with app.app_context():
+        db = get_db()
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL
+            )
+            """
+        )
+        db.commit()
+
+
+init_users_table()
+
+
+def read_credentials():
+    """Return (username, password) or None if the body is missing/invalid."""
+    data = request.get_json(silent=True) or {}
+    username = data.get("username")
+    password = data.get("password")
+    if not isinstance(username, str) or not isinstance(password, str):
+        return None
+    username = username.strip()
+    if not username or not password:
+        return None
+    return username, password
+
+
+# --- Week 8: auth routes -------------------------------------------------
+
+@app.post("/register")
+def register():
+    creds = read_credentials()
+    if creds is None:
+        return jsonify({"error": "username and password are required"}), 400
+    username, password = creds
+    db = get_db()
+    try:
+        cur = db.execute(
+            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+            (username, generate_password_hash(password)),
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "username already taken"}), 409
+    return jsonify({"id": cur.lastrowid, "username": username}), 201
+
+
+@app.post("/login")
+def login():
+    creds = read_credentials()
+    if creds is None:
+        return jsonify({"error": "username and password are required"}), 400
+    username, password = creds
+    row = get_db().execute(
+        "SELECT * FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    # Same 401 for "no such user" and "wrong password" so attackers
+    # can't tell which usernames exist.
+    if row is None or not check_password_hash(row["password_hash"], password):
+        return jsonify({"error": "invalid username or password"}), 401
+    return jsonify({"message": "login successful", "username": row["username"]})
+
+
+# --- Recipes (unchanged) -------------------------------------------------
 
 def recipe_to_dict(row):
     return {
