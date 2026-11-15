@@ -1,0 +1,37 @@
+[1mdiff --git a/app.py b/app.py[m
+[1mindex 8902d26..f0ab0d2 100644[m
+[1m--- a/app.py[m
+[1m+++ b/app.py[m
+[36m@@ -17,6 +17,14 @@[m [mDATABASE = "recipes.db"[m
+ app = Flask(__name__)[m
+ [m
+ [m
+[32m+[m[32mdef hash_password(plaintext_password: str) -> str:[m
+[32m+[m[32m    return generate_password_hash(plaintext_password)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef verify_password(stored_hash: str, candidate_password: str) -> bool:[m
+[32m+[m[32m    return check_password_hash(stored_hash, candidate_password)[m
+[32m+[m
+[32m+[m
+ def get_db():[m
+     if "db" not in g:[m
+         g.db = sqlite3.connect(DATABASE)[m
+[36m@@ -78,7 +86,7 @@[m [mdef register():[m
+     try:[m
+         cur = db.execute([m
+             "INSERT INTO users (username, password_hash) VALUES (?, ?)",[m
+[31m-            (username, generate_password_hash(password)),[m
+[32m+[m[32m            (username, hash_password(password)),[m
+         )[m
+         db.commit()[m
+     except sqlite3.IntegrityError:[m
+[36m@@ -97,7 +105,7 @@[m [mdef login():[m
+     ).fetchone()[m
+     # Same 401 for "no such user" and "wrong password" so attackers[m
+     # can't tell which usernames exist.[m
+[31m-    if row is None or not check_password_hash(row["password_hash"], password):[m
+[32m+[m[32m    if row is None or not verify_password(row["password_hash"], password):[m
+         return jsonify({"error": "invalid username or password"}), 401[m
+     return jsonify({"message": "login successful", "username": row["username"]})[m
+ [m
