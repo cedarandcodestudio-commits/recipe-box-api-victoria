@@ -7,12 +7,20 @@ That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 Week 8 additions: a users table, POST /register and POST /login.
 """
 
+from datetime import datetime, timedelta
 import sqlite3
+import os
+from time import timezone
 
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+
+import jwt
+
 DATABASE = "recipes.db"
+
+JWT_SECRET = os.getenv("JWT_SECRET")
 
 app = Flask(__name__)
 
@@ -107,7 +115,23 @@ def login():
     # can't tell which usernames exist.
     if row is None or not verify_password(row["password_hash"], password):
         return jsonify({"error": "invalid username or password"}), 401
-    return jsonify({"message": "login successful", "username": row["username"]})
+
+    # Credentials are valid: issue a signed JWT
+    user_id = row["id"]
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),          # user id as string
+        "username": row["username"],
+        "exp": now + timedelta(hours=1),
+    }
+
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+    return jsonify({
+        "message": "login successful",
+        "username": row["username"],
+        "token": token,
+    })
 
 
 # --- Recipes (unchanged) -------------------------------------------------
