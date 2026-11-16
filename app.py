@@ -7,10 +7,10 @@ That is the point: you will add both, lesson by lesson, in Units 2 and 3.
 Week 8 additions: a users table, POST /register and POST /login.
 """
 
-from datetime import datetime, timedelta
+
 import sqlite3
 import os
-from time import timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
