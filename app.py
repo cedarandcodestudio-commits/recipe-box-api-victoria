@@ -10,7 +10,8 @@ Week 8 additions: a users table, POST /register and POST /login.
 
 import sqlite3
 import os
-from datetime import datetime, timedelta, timezone
+import datetime
+from datetime import timedelta
 
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -118,16 +119,17 @@ def login():
 
     # Credentials are valid: issue a signed JWT
     user_id = row["id"]
-    now = datetime.utcnow()
+    now = datetime.datetime.utcnow()
     exp = now + timedelta(hours=1)
 
     payload = {
-        "sub": str(user_id),          # user id as string
+        "sub": str(user_id),
         "username": row["username"],
-        "exp": int(exp.timestamp()),  # Unix timestamp
+        "exp": int(exp.timestamp()),
     }
 
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
     return jsonify({
         "message": "login successful",
         "username": row["username"],
