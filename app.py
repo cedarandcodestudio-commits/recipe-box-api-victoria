@@ -22,6 +22,8 @@ import jwt
 DATABASE = "recipes.db"
 
 JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_SECRET = os.getenv("JWT_SECRET")
+print("JWT_SECRET is:", repr(JWT_SECRET))
 
 app = Flask(__name__)
 
@@ -129,6 +131,7 @@ def login():
     }
 
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
 
     return jsonify({
         "message": "login successful",
