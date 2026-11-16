@@ -118,15 +118,16 @@ def login():
 
     # Credentials are valid: issue a signed JWT
     user_id = row["id"]
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
+    exp = now + timedelta(hours=1)
+
     payload = {
         "sub": str(user_id),          # user id as string
         "username": row["username"],
-        "exp": now + timedelta(hours=1),
+        "exp": int(exp.timestamp()),  # Unix timestamp
     }
 
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-
     return jsonify({
         "message": "login successful",
         "username": row["username"],
