@@ -1,14 +1,15 @@
 """Create and seed recipes.db. Run once after cloning: python init_db.py"""
 
 import sqlite3
-
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS recipes (
     id INTEGER PRIMARY KEY,
     title TEXT NOT NULL UNIQUE,
     ingredients TEXT NOT NULL,
     instructions TEXT NOT NULL DEFAULT '',
-    is_public INTEGER NOT NULL DEFAULT 1
+    is_public INTEGER NOT NULL DEFAULT 1,
+    owner_id INTEGER NOT NULL,
+    FOREIGN KEY (owner_id) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS users (
@@ -18,7 +19,6 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL
 );
 """
-
 SEED = [
     (
         "Shakshuka",
@@ -45,8 +45,8 @@ connection.executescript(SCHEMA)
 existing = connection.execute("SELECT COUNT(*) FROM recipes").fetchone()[0]
 if existing == 0:
     connection.executemany(
-        "INSERT INTO recipes (title, ingredients, instructions, is_public)"
-        " VALUES (?, ?, ?, ?)",
+        "INSERT INTO recipes (title, ingredients, instructions, is_public, owner_id)"
+        " VALUES (?, ?, ?, ?, 1)",
         SEED,
     )
     connection.commit()

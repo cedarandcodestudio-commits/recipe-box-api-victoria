@@ -12,6 +12,7 @@ import sqlite3
 import os
 import datetime
 from datetime import timedelta
+import token
 
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -24,6 +25,7 @@ DATABASE = "recipes.db"
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_SECRET = os.getenv("JWT_SECRET")
 print("JWT_SECRET is:", repr(JWT_SECRET))
+print("JWT_SECRET type/value:", type(JWT_SECRET), repr(JWT_SECRET))
 
 app = Flask(__name__)
 
@@ -175,9 +177,28 @@ def get_recipe(recipe_id):
 
 @app.post("/recipes")
 def create_recipe():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "authentication token required"}), 401
+
+    token = auth_header[len("Bearer "):].strip()
+    try:
+        jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return jsonify({
+            "error": "authentication token has expired, please log in again"
+        }), 401
+    except jwt.PyJWTError:
+        return jsonify({
+            "error": "invalid authentication token"
+        }), 401
+
     data = request.get_json(silent=True)
-    if not data or not data.get("title") or not data.get("ingredients"):
+    if not data:
+        return jsonify({"error": "a JSON body is required"}), 400
+    if not data.get("title") or not data.get("ingredients"):
         return jsonify({"error": "title and ingredients are required"}), 400
+
     db = get_db()
     try:
         cur = db.execute(
@@ -193,6 +214,7 @@ def create_recipe():
         db.commit()
     except sqlite3.IntegrityError:
         return jsonify({"error": "a recipe with that title already exists"}), 409
+
     row = db.execute(
         "SELECT * FROM recipes WHERE id = ?", (cur.lastrowid,)
     ).fetchone()
