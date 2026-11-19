@@ -76,7 +76,9 @@ init_users_table()
 
 def read_credentials():
     """Return (username, password) or None if the body is missing/invalid."""
+    print("DEBUG raw data:", request.data)
     data = request.get_json(silent=True) or {}
+    print("DEBUG parsed json:", data)
     username = data.get("username")
     password = data.get("password")
     if not isinstance(username, str) or not isinstance(password, str):
@@ -85,7 +87,6 @@ def read_credentials():
     if not username or not password:
         return None
     return username, password
-
 
 # --- Week 8: auth routes -------------------------------------------------
 
