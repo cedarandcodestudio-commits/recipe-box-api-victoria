@@ -183,7 +183,7 @@ def create_recipe():
 
     token = auth_header[len("Bearer "):].strip()
     try:
-        jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
         return jsonify({
             "error": "authentication token has expired, please log in again"
@@ -193,22 +193,26 @@ def create_recipe():
             "error": "invalid authentication token"
         }), 401
 
+    user_id = payload["user_id"]  # use whatever key your login route puts in the token
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "a JSON body is required"}), 400
     if not data.get("title") or not data.get("ingredients"):
         return jsonify({"error": "title and ingredients are required"}), 400
-
+    payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    user_id = int(payload["sub"])
     db = get_db()
     try:
         cur = db.execute(
-            "INSERT INTO recipes (title, ingredients, instructions, is_public)"
-            " VALUES (?, ?, ?, ?)",
+            "INSERT INTO recipes (title, ingredients, instructions, is_public, owner_id)"
+            " VALUES (?, ?, ?, ?, ?)",
             (
                 data["title"],
                 data["ingredients"],
                 data.get("instructions", ""),
                 1 if data.get("is_public", True) else 0,
+                user_id,
             ),
         )
         db.commit()
@@ -220,9 +224,36 @@ def create_recipe():
     ).fetchone()
     return jsonify(recipe_to_dict(row)), 201
 
-
 @app.patch("/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
+    # 1–2. Verify the token and get user_id
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "authentication token required"}), 401
+
+    token = auth_header[len("Bearer "):].strip()
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return jsonify({
+            "error": "authentication token has expired, please log in again"
+        }), 401
+    except jwt.PyJWTError:
+        return jsonify({"error": "invalid authentication token"}), 401
+
+    user_id = int(payload["sub"])
+
+    # 3–5. Check the recipe exists and belongs to this user
+    db = get_db()
+    existing = db.execute(
+        "SELECT owner_id FROM recipes WHERE id = ?", (recipe_id,)
+    ).fetchone()
+    if existing is None:
+        return jsonify({"error": "recipe not found"}), 404
+    if existing["owner_id"] != user_id:
+        return jsonify({"error": "you can only edit your own recipes"}), 403
+
+    # 6. Your original update logic
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "a JSON body is required"}), 400
@@ -237,21 +268,19 @@ def update_recipe(recipe_id):
     if not fields:
         return jsonify({"error": "nothing to update"}), 400
     values.append(recipe_id)
-    db = get_db()
+
     try:
-        cur = db.execute(
+        db.execute(
             f"UPDATE recipes SET {', '.join(fields)} WHERE id = ?", values
         )
         db.commit()
     except sqlite3.IntegrityError:
         return jsonify({"error": "a recipe with that title already exists"}), 409
-    if cur.rowcount == 0:
-        return jsonify({"error": "recipe not found"}), 404
+
     row = db.execute(
         "SELECT * FROM recipes WHERE id = ?", (recipe_id,)
     ).fetchone()
     return jsonify(recipe_to_dict(row))
-
 
 @app.delete("/recipes/<int:recipe_id>")
 def delete_recipe(recipe_id):
